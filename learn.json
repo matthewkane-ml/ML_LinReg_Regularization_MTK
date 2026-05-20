@@ -7,8 +7,8 @@
     "us": "A standardized, but flexible project structure for doing and sharing data science and machine learning work.",
     "es": "Una estructura de proyecto estandarizada, pero flexible, para realizar y compartir trabajos de ciencia de datos y aprendizaje de máquina."
   },
-  "repository": "https://github.com/4GeeksAcademy/machine-learning-python-template",
-  "preview": "https://github.com/4GeeksAcademy/machine-learning-python-template/blob/main/preview.jpg?raw=true",
+  "repository": "https://github.com/matthewkane-ml/ML_LinReg_Regularization_Project",
+  "preview": "https://github.com/matthewkane-ml/ML_LinReg_Regularization_Project/blob/main/preview.jpg?raw=true",
   "projectType": "template",
   "difficulty": "beginner",
   "technologies": ["Python", "Machine-Learning", "Datascience", "ai-engineering"]
