@@ -1,110 +1,92 @@
-# Data Science Project Boilerplate
+# Lasso Regression — Predicting County-Level Heart Disease
 
-This boilerplate is designed to kickstart data science projects by providing a basic setup for database connections, data processing, and machine learning model development. It includes a structured folder organization for your datasets and a set of pre-defined Python packages necessary for most data science tasks.
+> Regression pipeline on US county-level sociodemographic and health data: heavy feature pruning from a wide dataset, SelectKBest pre-filtering, and a Lasso (L1-regularized) model that zeroes out weak predictors — demonstrating why regularization matters when features outnumber signal.
 
-## Structure
+---
 
-The project is organized as follows:
+## Problem
 
-- **`src/app.py`** → Main Python script where your project will run.
-- **`src/explore.ipynb`** → Notebook for exploration and testing. Once exploration is complete, migrate the clean code to `app.py`.
-- **`src/utils.py`** → Auxiliary functions, such as database connection.
-- **`requirements.txt`** → List of required Python packages.
-- **`models/`** → Will contain your SQLAlchemy model classes.
-- **`data/`** → Stores datasets at different stages:
-  - **`data/raw/`** → Raw data.
-  - **`data/interim/`** → Temporarily transformed data.
-  - **`data/processed/`** → Data ready for analysis.
+Sociodemographic and health resource data has been collected at the county level across the United States (2018–2019). The goal is to determine whether there is a meaningful relationship between sociodemographic factors — poverty, education, age distribution, race, employment — and heart disease burden. The target is a raw count: total people per county diagnosed with heart disease.
 
+## Dataset
 
-## ⚡ Initial Setup in Codespaces (Recommended)
+- **Source:** US county-level demographic health dataset (2018–2019)
+- **Target:** `Heart disease_number` — total heart disease cases per county (continuous)
+- **Raw shape:** Wide dataset with ~50+ columns covering population demographics, income, education, employment, race distribution, and disease prevalence/counts
 
-No manual setup is required, as **Codespaces is automatically configured** with the predefined files created by the academy for you. Just follow these steps:
+## EDA & Preprocessing Pipeline
 
-1. **Wait for the environment to configure automatically**.
-   - All necessary packages and the database will install themselves.
-   - The automatically created `username` and `db_name` are in the **`.env`** file at the root of the project.
-2. **Once Codespaces is ready, you can start working immediately**.
+**Step 1 — Aggressive column pruning** before any analysis:
 
+| Category dropped | Reason |
+|---|---|
+| `Heart disease_prevalence`, CI bounds | Data leakage — derived from the target |
+| Other disease raw counts & prevalence | Outcome variables, not predictors |
+| All CI bound columns | Redundant with point estimates |
+| Raw age/race population counts | % equivalents retained instead |
+| Raw employment/poverty counts | Rate/% equivalents retained instead |
 
-## 💻 Local Setup (Only if you can't use Codespaces)
+| Step | Action |
+|---|---|
+| Duplicates | None found |
+| Null handling | Rows with null target dropped; remaining nulls filled with column median |
+| Outlier capping | IQR method on TOT_POP, MEDHHINC_2018, GQ_ESTIMATES_2018 |
+| String columns | Any remaining object columns (e.g. county name) dropped |
+| Scaling | MinMaxScaler on all feature columns |
+| Feature selection | SelectKBest (f_regression, k=15) — generous k because Lasso performs further pruning during training |
+| Split | 80/20 train/test |
 
-**Prerequisites**
+**Top predictors identified (by correlation with target):**
 
-Make sure you have Python 3.11+ installed on your machine. You will also need pip to install the Python packages.
+| Feature | Direction |
+|---|---|
+| TOT_POP (county population) | Strong positive — larger counties have more cases by definition |
+| Obesity_prevalence | Positive |
+| % Black-alone | Positive |
+| PCTPOVALL_2018 (poverty rate) | Positive |
+| 80+ y/o % of total pop | Positive |
+| MEDHHINC_2018 (median household income) | Negative |
+| Bachelor's degree % | Negative |
+| Active Physicians per 100k | Negative |
 
-**Installation**
+## Model
 
-Clone the project repository to your local machine.
+**Two models compared:**
 
-Navigate to the project directory and install the required Python packages:
+| Model | Description |
+|---|---|
+| `LinearRegression` | Baseline — no regularization |
+| `Lasso(alpha=1.0)` | L1 regularization — shrinks weak coefficients to exactly zero |
+
+Lasso is the right choice for this dataset because: (1) the feature set is wide relative to signal, (2) many sociodemographic indicators are correlated with each other, and (3) L1 regularization produces a sparse model that automatically identifies which predictors are genuinely useful.
+
+The trained Lasso model is saved to `models/lasso_alpha-1.0.sav`.
+
+## Key Takeaways
+
+- **Population is not a feature — it's a confounder:** TOT_POP must be included because a county of 1 million will always have more heart disease cases than a county of 5,000 regardless of sociodemographic factors. Without it, the model learns county size, not health risk factors.
+- **Leakage in wide datasets is everywhere:** Heart disease prevalence, CI bounds, and derived count columns all needed to be dropped before any analysis — they encode the answer rather than predicting it.
+- **L1 vs L2 regularization:** Lasso (L1) drives weak coefficients to zero, producing a sparse, interpretable model. Ridge (L2) shrinks all coefficients but keeps them all. When the goal is to identify which sociodemographic factors matter, Lasso's sparsity is more useful.
+
+## Tech Stack
+
+`Python` · `scikit-learn` · `pandas` · `NumPy` · `Matplotlib` · `Seaborn`
+
+## Run It Locally
 
 ```bash
+git clone https://github.com/matthewkane-ml/ML_LinReg_Regularization_MTK.git
+cd ML_LinReg_Regularization_MTK
 pip install -r requirements.txt
-```
-
-**Create a database (if necessary)**
-
-Create a new database within the Postgres engine by customizing and executing the following command:
-
-```bash
-$ psql -U postgres -c "DO \$\$ BEGIN 
-    CREATE USER my_user WITH PASSWORD 'my_password'; 
-    CREATE DATABASE my_database OWNER my_user; 
-END \$\$;"
-```
-Connect to the Postgres engine to use your database, manipulate tables, and data:
-
-```bash
-$ psql -U my_user -d my_database
-```
-
-Once inside PSQL, you can create tables, run queries, insert, update, or delete data, and much more!
-
-**Environment Variables**
-
-Create a .env file in the root directory of the project to store your environment variables, such as your database connection string:
-
-```makefile
-DATABASE_URL="postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>"
-
-#example
-DATABASE_URL="postgresql://my_user:my_password@localhost:5432/my_database"
-```
-
-## Running the Application
-
-To run the application, execute the app.py script from the root directory of the project:
-
-```bash
 python src/app.py
 ```
 
-## Adding Models
+## What I'd Do Next
 
-To add SQLAlchemy model classes, create new Python script files within the models/ directory. These classes should be defined according to your database schema.
+- Tune `alpha` with cross-validation (`LassoCV`) instead of using a fixed value of 1.0 — the optimal regularization strength depends on the data
+- Engineer a **per-capita** target (`heart_disease_number / TOT_POP`) to study health risk factors independently of population size
+- Compare Lasso against **ElasticNet** (L1 + L2 hybrid) to see whether combining both penalties improves out-of-sample R²
 
-Example model definition (`models/example_model.py`):
+---
 
-```py
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
-```
-
-## Working with Data
-
-You can place your raw datasets in the data/raw directory, intermediate datasets in data/interim, and processed datasets ready for analysis in data/processed.
-
-To process data, you can modify the app.py script to include your data processing steps, using pandas for data manipulation and analysis.
-
-## Contributors
-
-This project is maintained by [matthewkane-ml](https://github.com/matthewkane-ml).
+**Author:** Matthew Kane — [LinkedIn](https://www.linkedin.com/in/thomas-k-392094410/) · [GitHub portfolio](https://github.com/matthewkane-ml)
